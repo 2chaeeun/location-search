@@ -41,6 +41,55 @@
 * 카카오 장소 검색 API의 결과를 기준으로 두 API 검색 결과에 동일하게 나타나는 문서(장소)가 상위에 올 수 있도록 정렬합니다.
 * 둘 중 하나에만 존재하는 경우, 카카오 결과를 우선 배치 후 네이버 결과 배치합니다.
 
+### 2. 카카오, 네이버 API 조회
+
+* 요청을 받으면 ReactiveRedisTemplate을 사용하여 비동기로 Redis의 Sorted Set에 검색어의 score를 1추가하여 저장합니다.
+* Redis 저장이 실패하더라도 API응답은 정상적으로 동작합니다.
+
+```
+    public void zincrby(String key, double increment, String member) {
+        reactiveRedisTemplate.opsForZSet().incrementScore(key, member, increment)
+                        .onErrorResume(error -> {
+                            log.error("Redis ERROR", error);
+                            return Mono.empty();
+                        }).subscribe();
+    }
+ ```
+
+* 카카오, 네이버 API 요청은 병렬로 실행하고 두 요청이 모두 완료되면 다음 동작을 해야하므로 WebClient의 Mono.zip()을 사용했습니다.
+
+```java
+rankingRepository.zincrby("ranking",1,keyword); // 검색어 Redis에 비동기로 저장
+        Mono<List<Place>>kakaoSearchResults=kaKaoSearch.search(keyword);
+        Mono<List<Place>>naverSearchResults=naverSearch.search(keyword);
+        Tuple2<List<Place>,List<Place>>block=Mono.zip(kakaoSearchResults,naverSearchResults).block();
+        List<Place> kakao=block.getT1();
+        List<Place> naver=block.getT2();
+```
+
+* 카카오, 네이버 API 요청 시 500대 에러가 발생하면 재시도 3번합니다. 재시도 3번해도 에러가 발생하면 빈 리스트를 반환합니다.
+* 500대 이외의 에러(ex.400대 에러)가 발생하면 재시도 할 필요 없이 빈 리스트를 반환합니다.
+* 카카오 API가 실패하더라도 네이버의 결과를 사용해서 응답해야하므로 예외를 던지지 않고 빈 리스트를 반환하였습니다.
+
+```aidl
+    @Override
+    public Mono<List<Place>> search(String keyword) {
+        return kakaoWebClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/v2/local/search/keyword.json")
+                        .queryParam("query", keyword)
+                        .queryParam("page", 1)
+                        .queryParam("size", 5)
+                        .queryParam("sort", "accuracy")
+                        .build())
+                .retrieve()
+                .bodyToMono(KaKaoSearchResponse.class)
+                .retryWhen(Retry.max(3).filter(this::is5xxServerError))
+                .map(res -> kaKaoMapper.kakaoToSearchResponse(res))
+                .onErrorReturn(Collections.emptyList());
+    }
+```
+
 ### 2. 리스트 병합 (mergeSearch)
 
 * 확장성을 위해서 List를 입력 값으로 받습니다. placesList에 병합할 리스트를 넣습니다.
