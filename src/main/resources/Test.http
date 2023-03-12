@@ -1,0 +1,9 @@
+### 장소 검색
+
+GET http://localhost:8080/v1/search/place?keyword=하나은행 본점
+
+GET http://localhost:8080/v1/ranking/keyword
+
+
+
+### 검색 키워드 랭킹
