@@ -46,7 +46,7 @@
 * 요청을 받으면 ReactiveRedisTemplate을 사용하여 비동기로 Redis의 Sorted Set에 검색어의 score를 1추가하여 저장합니다.
 * Redis 저장이 실패하더라도 API응답은 정상적으로 동작합니다.
 
-```
+```java
     public void zincrby(String key, double increment, String member) {
         reactiveRedisTemplate.opsForZSet().incrementScore(key, member, increment)
                         .onErrorResume(error -> {
@@ -71,7 +71,7 @@ rankingRepository.zincrby("ranking",1,keyword); // 검색어 Redis에 비동기�
 * 500대 이외의 에러(ex.400대 에러)가 발생하면 재시도 할 필요 없이 빈 리스트를 반환합니다.
 * 카카오 API가 실패하더라도 네이버의 결과를 사용해서 응답해야하므로 예외를 던지지 않고 빈 리스트를 반환하였습니다.
 
-```aidl
+```java
     @Override
     public Mono<List<Place>> search(String keyword) {
         return kakaoWebClient.get()
@@ -95,7 +95,7 @@ rankingRepository.zincrby("ranking",1,keyword); // 검색어 Redis에 비동기�
 * 확장성을 위해서 List를 입력 값으로 받습니다. placesList에 병합할 리스트를 넣습니다.
 * 리스트에 먼저 넣을수록 우선순위가 높습니다.
 * 만약에 카카오, 네이버, 구글 순으로 넣는다면 많이 나온 장소가 상위에 오고, 나온 횟수가 같다면 카카오, 네이버, 구글 순으로 정렬됩니다.
-  ```
+  ```java
         List<List<Place>> placesList = new ArrayList<>();
         placesList.add(kakao);
         placesList.add(naver);
@@ -103,7 +103,7 @@ rankingRepository.zincrby("ranking",1,keyword); // 검색어 Redis에 비동기�
   ```
 * 결과를 담을 리스트(results)를 만듭니다. 첫번째 리스트는 results에 다 넣습니다. 다음 리스트의 원소를 results의 원소와 매칭하여 동일한 원소일 경우에 results의 원소 카운트를 증가시키고,
   같은 카운트의 원소가 나올 때까지 앞으로 이동시킵니다.
-  ```
+  ```java
     public List<Place> mergeSearch(List<List<Place>> placesList) {
         List<Place> results = new ArrayList<>();
         for (List<Place> places : placesList) {
@@ -142,7 +142,7 @@ rankingRepository.zincrby("ranking",1,keyword); // 검색어 Redis에 비동기�
         * WGS84 좌표계로 통일한 후 유클리드 거리 알고리즘을 사용하였습니다.
         * 판별하기 쉽게 x와 y에 10^5를 곱하였고, 샘플링을 해보니 동일한 두 장소가 1200이 나왔습니다.
         * 최악의 경우를 1500으로 설정하여 1500보다 큰 경우는 다른 장소라고 판별하였습니다.
-  ```
+  ```java
       public boolean isSameLocation(Coordinate a, Coordinate b) {
           final double worstCase = 1500;
           double x = a.getX() - b.getX();
@@ -204,7 +204,7 @@ curl -XGET "localhost:8080/v1/search/place?keyword=%ED%95%98%EB%82%98%EC%9D%80%E
 
 ### Response
 
-```
+```json
 {
     "places": [
         {
@@ -313,7 +313,7 @@ curl -XGET 'localhost:8080/v1/ranking/keyword'
 
 ### Response
 
-```
+```json
 {
     "keywords": [
         {
