@@ -79,9 +79,10 @@
                 .map(res -> kaKaoMapper.kakaoToSearchResponse(res))
                 .onErrorReturn(Collections.emptyList());
     }
-
-### 3. 검색어 저장    
 ```
+
+### 3. 검색어 저장  
+
 * 검색어 랭킹 조회를 위해서 검색 요청을 받으면 ReactiveRedisTemplate을 사용하여 비동기로 Redis의 Sorted Set에 검색어와 score를 1추가하여 저장합니다.
 * Redis 저장이 실패하더라도 검색 API응답은 정상적으로 동작하도록 구현하였습니다.
 
